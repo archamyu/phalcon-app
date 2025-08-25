@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: phalcon_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: phalcon_db
+      MYSQL_USER: dev-anandaiyp
+      MYSQL_PASSWORD: M3J4K1T4
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - phalcon_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: phalcon_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - phalcon_network
+    command: redis-server --appendonly yes
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: phalcon_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - phalcon_network
+
+  phalcon:
+    image: phalconphp/cphalcon:v5.9.2-php8.4
+    container_name: phalcon_app
+    volumes:
+      - ./tutorial:/var/www/html
+    expose:
+      - "80"
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=phalcon_db
+      - DB_USER=dev-anandaiyp
+      - DB_PASS=M3J4K1T4
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=admin123
+      - RABBITMQ_VHOST=/
+    networks:
+      - phalcon_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: phalcon_nginx
+    ports:
+      - "8080:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./tutorial:/var/www/html
+    depends_on:
+      - phalcon
+    networks:
+      - phalcon_network
+
+volumes:
+  mysql_data:
+  redis_data:
+  rabbitmq_data:
+
+networks:
+  phalcon_network:
+    driver: bridge
