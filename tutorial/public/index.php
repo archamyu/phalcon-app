@@ -1,12 +1,13 @@
 <?php
-
+require __DIR__ . '/../vendor/autoload.php';
 use Phalcon\Di\FactoryDefault;
 use Phalcon\Autoload\Loader;
 use Phalcon\Mvc\View;
 use Phalcon\Mvc\Application;
 use Phalcon\Db\Adapter\Pdo\Mysql;
 use Phalcon\Mvc\Url as MvcUrl;
-
+use Predis\Client;
+use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 define('BASE_PATH', dirname(__DIR__));
 define('APP_PATH', BASE_PATH . '/src');
@@ -42,7 +43,7 @@ $container->set(
     }
 );
 
-$container->set(
+$container->setShared(
     'db',
     function () {
         return new Mysql(
@@ -55,6 +56,26 @@ $container->set(
         );
     }
 );
+
+$container->setShared(
+    'redis', 
+    function () {
+        return new Client(
+            [
+                'scheme' => 'tcp',
+                'host'   => getenv('REDIS_HOST'),
+                'port'   => getenv('REDIS_PORT'),
+            ]
+        );
+    }
+);
+
+$container->setShared('rabbitmq', function () {
+    $connection = new AMQPStreamConnection(getenv('RABBITMQ_HOST'), getenv('RABBITMQ_PORT'), getenv('RABBITMQ_USER'), getenv('RABBITMQ_PASS'));
+    $channel = $connection->channel();
+    $channel->queue_declare('user_created', false, true, false, false);
+    return $channel;
+});
 
 $application = new Application($container);
 

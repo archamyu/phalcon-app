@@ -1,7 +1,7 @@
 <?php
 
-use Phalcon\Http\Response;
 use Phalcon\Mvc\Controller;
+use PhpAmqpLib\Message\AMQPMessage;
 
 class SignupController extends Controller
 {
@@ -24,6 +24,15 @@ class SignupController extends Controller
         $this->view->success = $success;
 
         if ($success) {
+            $this->redis->set("user:{$user->id}", json_encode($user));
+
+            $msg = new AMQPMessage(json_encode([
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email
+            ]));
+            $this->rabbitmq->basic_publish($msg, '', 'user_created');
+
             $message = "Thanks for registering!";
         } else {
             $message = "Sorry, the following problems were generated:<br>"
@@ -37,9 +46,17 @@ class SignupController extends Controller
     {
         if ($this->request->isGet()) {
             $user = Users::findFirstById($id);
+            $cached = $this->redis->get("user:$id");
+
+            if ($cached) {
+                return $this->view->user = json_decode($cached);
+            }
+
             if (!$user) {
                 return $this->response->redirect('signup');
             }
+
+            $this->redis->set("user:{$user->id}", json_encode($user));
             $this->view->user = $user;
             return;
         }
@@ -72,6 +89,13 @@ class SignupController extends Controller
     public function deleteAction($id = null)
     {
         Users::findFirstById($id)->delete();
+
+        $cached = $this->redis->get("user:$id");
+
+        if ($cached) {
+            $this->redis->del("user:$id");
+        }
+
         return $this->response->redirect('signup');
     }
 }

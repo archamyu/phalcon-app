@@ -4,7 +4,7 @@ use Phalcon\Mvc\Controller;
 
 class IndexController extends Controller
 {
-    public function indexAction() 
+    public function indexAction()
     {
         $this->view->users = Users::find();
     }
